@@ -1,0 +1,735 @@
+<title>Журнал уроков</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: одна колонка как у телефонного приложения — месяц сверху, список дня под ним, нижняя панель с вкладками и кнопкой «+» */
+:root {
+  --bg: #F3F4F8; --surface: #FFFFFF; --ink: #161B2E; --muted: #636A84; --line: #E1E4EE;
+  --accent: #3D5AFE; --accent-ink: #FFFFFF; --soft: #E8ECFF;
+  --done: #17875B; --done-soft: #DDF3E9; --cancel: #C2453D; --cancel-soft: #F8E3E1;
+  --shadow: 0 8px 28px rgba(22,27,46,.12);
+  --f-display: "Unbounded", "Manrope", system-ui, sans-serif;
+  --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0F1220; --surface: #181C2E; --ink: #E9EBF5; --muted: #9AA0BA; --line: #2A2F45;
+  --accent: #8292FF; --accent-ink: #0F1220; --soft: #232A4D;
+  --done: #4CCB93; --done-soft: #183427; --cancel: #F07A70; --cancel-soft: #3A1E1E;
+  --shadow: 0 8px 28px rgba(0,0,0,.45); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0F1220; --surface: #181C2E; --ink: #E9EBF5; --muted: #9AA0BA; --line: #2A2F45;
+  --accent: #8292FF; --accent-ink: #0F1220; --soft: #232A4D;
+  --done: #4CCB93; --done-soft: #183427; --cancel: #F07A70; --cancel-soft: #3A1E1E;
+  --shadow: 0 8px 28px rgba(0,0,0,.45); color-scheme: dark }
+
+* { box-sizing: border-box }
+html, body { background: var(--bg); color: var(--ink) }
+body { font-family: var(--f-body); font-size: 15px; line-height: 1.45; -webkit-tap-highlight-color: transparent }
+button, input, select, textarea { font: inherit; color: inherit }
+button { cursor: pointer }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.num { font-variant-numeric: tabular-nums }
+
+.app { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 12px 120px; display: flex; flex-direction: column; gap: 16px }
+
+header.top { display: flex; align-items: center; gap: 8px }
+header.top h1 { font-family: var(--f-display); font-weight: 700; font-size: 22px; margin: 0; flex: 1; text-transform: capitalize; text-wrap: balance; letter-spacing: -.01em }
+header.top h1 small { display: block; font-family: var(--f-body); font-weight: 500; font-size: 12px; color: var(--muted); text-transform: none; letter-spacing: .02em }
+.icon-btn { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; font-size: 18px }
+.chip-btn { height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 13px }
+
+.sync { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap }
+.sync .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted) }
+.sync.ok .dot { background: var(--done) }
+.sync.warn .dot { background: var(--cancel) }
+
+/* Итоги месяца */
+.totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px }
+.tot { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; min-width: 0 }
+.tot b { display: block; font-family: var(--f-display); font-weight: 500; font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.2 }
+.tot span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em }
+
+/* Календарь */
+.cal { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 10px }
+.wd, .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px }
+.wd div { text-align: center; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 4px 0 6px }
+.day { aspect-ratio: 1 / 1.05; max-width: 100%; border: 0; background: transparent; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 6px; gap: 4px; position: relative }
+.day .n { font-weight: 600; font-size: 14px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-variant-numeric: tabular-nums }
+.day.out { opacity: .32 }
+.day.today .n { background: var(--soft); color: var(--accent) }
+.day.sel { background: var(--accent) }
+.day.sel .n { color: var(--accent-ink); background: transparent }
+.day .marks { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; max-width: 34px }
+.mk { width: 6px; height: 6px; border-radius: 50%; background: var(--accent) }
+.mk.done { background: var(--done) }
+.mk.cancelled { background: transparent; box-shadow: inset 0 0 0 1.5px var(--cancel) }
+.day.sel .mk { background: var(--accent-ink) }
+.day.sel .mk.cancelled { background: transparent; box-shadow: inset 0 0 0 1.5px var(--accent-ink) }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); padding: 8px 4px 2px; flex-wrap: wrap }
+.legend i { display: inline-block; vertical-align: middle; margin-right: 5px }
+
+/* Список уроков дня */
+.dayhead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px }
+.dayhead h2 { font-family: var(--f-display); font-weight: 500; font-size: 16px; margin: 0; text-wrap: balance }
+.dayhead span { font-size: 13px; color: var(--muted) }
+.list { display: flex; flex-direction: column; gap: 10px }
+.lesson { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: grid; grid-template-columns: 58px 1fr; gap: 4px 12px }
+.lesson .time { font-family: var(--f-display); font-weight: 500; font-size: 16px; font-variant-numeric: tabular-nums; line-height: 1.2 }
+.lesson .time small { display: block; font-family: var(--f-body); font-size: 12px; color: var(--muted); font-weight: 500 }
+.lesson .body { min-width: 0; display: flex; flex-direction: column; gap: 4px }
+.lesson .who { font-weight: 700; font-size: 15px; overflow-wrap: anywhere }
+.lesson .meta { font-size: 13px; color: var(--muted); overflow-wrap: anywhere }
+.lesson.cancelled .who, .lesson.cancelled .time { text-decoration: line-through; opacity: .6 }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--soft); color: var(--accent); width: fit-content }
+.pill.done { background: var(--done-soft); color: var(--done) }
+.pill.cancelled { background: var(--cancel-soft); color: var(--cancel) }
+.acts { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; padding-top: 6px }
+.act { border: 1px solid var(--line); background: transparent; border-radius: 10px; padding: 7px 12px; font-size: 13px; font-weight: 600 }
+.act.danger { color: var(--cancel); border-color: color-mix(in srgb, var(--cancel) 40%, var(--line)) }
+.act.good { color: var(--done); border-color: color-mix(in srgb, var(--done) 40%, var(--line)) }
+.empty { border: 1.5px dashed var(--line); border-radius: 16px; padding: 22px 16px; text-align: center; color: var(--muted); font-size: 14px }
+.empty button { margin-top: 10px }
+
+/* Отчёт */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px }
+.card h3 { margin: 0 0 10px; font-family: var(--f-display); font-weight: 500; font-size: 15px }
+.tablewrap { overflow-x: auto }
+table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 6px 6px 8px; border-bottom: 1px solid var(--line) }
+td { padding: 9px 6px; border-bottom: 1px solid var(--line); vertical-align: top }
+tr:last-child td { border-bottom: 0 }
+td.r, th.r { text-align: right; white-space: nowrap }
+tfoot td { font-weight: 700; border-top: 1.5px solid var(--ink); border-bottom: 0 }
+.row-btns { display: flex; gap: 8px; flex-wrap: wrap }
+.btn { border: 0; border-radius: 12px; padding: 11px 16px; font-weight: 700; font-size: 14px; background: var(--accent); color: var(--accent-ink) }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line) }
+.report-text { white-space: pre-wrap; font-size: 13px; background: var(--bg); border-radius: 12px; padding: 12px; margin-top: 10px; max-height: 260px; overflow: auto; user-select: all }
+
+/* Настройки */
+.form { display: flex; flex-direction: column; gap: 14px }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0 }
+.field > label, .field > .lbl { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em }
+.field input, .field select, .field textarea { border: 1px solid var(--line); background: var(--bg); border-radius: 12px; padding: 11px 12px; width: 100%; min-width: 0; font-size: 16px }
+.field textarea { resize: vertical; min-height: 60px }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px }
+.check input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); flex: none }
+.hint { font-size: 12px; color: var(--muted) }
+.durs { display: flex; gap: 6px; flex-wrap: wrap }
+.durs button { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 12px; font-weight: 600; font-size: 13px }
+.durs button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+
+/* Нижняя панель */
+nav.bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px); border-top: 1px solid var(--line); z-index: 20 }
+nav.bar .in { max-width: 560px; margin: 0 auto; display: flex; align-items: center; gap: 6px }
+.tab { flex: 1; border: 0; background: transparent; border-radius: 12px; padding: 8px 4px; font-size: 12px; font-weight: 600; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 2px }
+.tab svg { width: 22px; height: 22px }
+.tab[aria-selected="true"] { color: var(--accent) }
+.fab { width: 56px; height: 56px; border-radius: 18px; border: 0; background: var(--accent); color: var(--accent-ink); font-size: 30px; line-height: 1; box-shadow: var(--shadow); flex: none; margin-top: -22px; display: grid; place-items: center }
+
+/* Шторка с формой */
+.scrim { position: fixed; inset: 0; background: rgba(10,12,22,.45); z-index: 30; display: flex; align-items: flex-end; justify-content: center }
+.sheet { background: var(--surface); width: 100%; max-width: 560px; max-height: 92%; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 10px 16px calc(18px + env(safe-area-inset-bottom, 0px)); box-shadow: var(--shadow); animation: up .22s ease-out }
+@keyframes up { from { transform: translateY(24px); opacity: .6 } to { transform: none; opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none } }
+.grab { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: 0 auto 12px }
+.sheet h2 { font-family: var(--f-display); font-weight: 500; font-size: 18px; margin: 0 0 14px }
+.sheet-acts { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; padding-top: 6px }
+.sheet-acts .btn { flex: 1 }
+.confirm { background: var(--cancel-soft); color: var(--ink); border-radius: 12px; padding: 12px; font-size: 14px; display: flex; flex-direction: column; gap: 10px }
+
+.toast { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; z-index: 40; max-width: calc(100% - 32px); box-shadow: var(--shadow) }
+</style>
+
+<div class="app" id="app">
+  <header class="top">
+    <h1 id="title"><small>Журнал уроков</small><span id="monthName">Месяц</span></h1>
+    <button class="icon-btn" id="prev" aria-label="Предыдущий месяц">‹</button>
+    <button class="chip-btn" id="todayBtn">Сегодня</button>
+    <button class="icon-btn" id="next" aria-label="Следующий месяц">›</button>
+  </header>
+
+  <div class="sync" id="sync"><span class="dot"></span><span id="syncText">Подключаюсь…</span></div>
+
+  <section class="totals" aria-label="Итоги месяца">
+    <div class="tot"><b class="num" id="tDone">0</b><span>Проведено</span></div>
+    <div class="tot"><b class="num" id="tHours">0 ч</b><span>Часов</span></div>
+    <div class="tot"><b class="num" id="tSecond">0</b><span id="tSecondLbl">Впереди</span></div>
+  </section>
+
+  <!-- Вкладка «Календарь» -->
+  <section id="viewCal" class="form">
+    <div class="cal">
+      <div class="wd"><div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div></div>
+      <div class="grid" id="grid"></div>
+      <div class="legend">
+        <span><i class="mk"></i>запланирован</span>
+        <span><i class="mk done"></i>проведён</span>
+        <span><i class="mk cancelled"></i>отменён</span>
+      </div>
+    </div>
+    <div class="dayhead"><h2 id="dayTitle">Сегодня</h2><span id="dayCount" class="num"></span></div>
+    <div class="list" id="dayList"></div>
+  </section>
+
+  <!-- Вкладка «Отчёт» -->
+  <section id="viewReport" class="form" hidden>
+    <div class="card">
+      <h3>По ученикам</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Ученик</th><th class="r">Уроков</th><th class="r">Часов</th><th class="r" id="thSum">Сумма</th></tr></thead>
+        <tbody id="repBody"></tbody>
+        <tfoot id="repFoot"></tfoot>
+      </table></div>
+    </div>
+    <div class="card">
+      <h3>Текст отчёта</h3>
+      <p class="hint" style="margin:0">Готовый список проведённых уроков за месяц. Скопируйте и отправьте.</p>
+      <div class="report-text num" id="repText"></div>
+      <div class="row-btns" style="margin-top:12px">
+        <button class="btn" id="copyRep">Скопировать</button>
+        <button class="btn ghost" id="csvRep" hidden>Скачать CSV</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Вкладка «Настройки» -->
+  <section id="viewSettings" class="form" hidden>
+    <div class="card form">
+      <h3>По умолчанию для новых уроков</h3>
+      <div class="two">
+        <div class="field"><label for="sDur">Длительность, мин</label><input id="sDur" type="number" min="5" step="5" inputmode="numeric"></div>
+        <div class="field"><label for="sRate">Ставка за урок</label><input id="sRate" type="number" min="0" step="any" inputmode="decimal" placeholder="необязательно"></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="sCur">Валюта</label><input id="sCur" type="text" maxlength="5"></div>
+        <div class="field"><label for="sRem">Напоминание</label><select id="sRem"></select></div>
+      </div>
+      <label class="check"><input type="checkbox" id="sSync"><span>Добавлять уроки в Google Календарь<br><span class="hint">Так напоминание придёт на телефон из приложения Google Календарь. Отменённые уроки оттуда удаляются.</span></span></label>
+      <div class="row-btns"><button class="btn" id="saveSettings">Сохранить</button></div>
+    </div>
+    <div class="card">
+      <h3>Как получать уведомления на телефон</h3>
+      <ol class="hint" style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13px">
+        <li>Установите на телефон приложение «Google Календарь» и войдите в тот же аккаунт Google, что подключён к Claude.</li>
+        <li>Разрешите ему уведомления в настройках телефона.</li>
+        <li>Откройте этот журнал в браузере телефона и добавьте его на главный экран (Поделиться → «На экран Домой»).</li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<nav class="bar"><div class="in">
+  <button class="tab" data-tab="cal" aria-selected="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Календарь</button>
+  <button class="tab" data-tab="report" aria-selected="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3.5h9l3.5 3.5v13.5H6z"/><path d="M9 11h7M9 14.5h7M9 18h4"/></svg>Отчёт</button>
+  <button class="fab" id="addBtn" aria-label="Добавить урок">+</button>
+  <button class="tab" data-tab="settings" aria-selected="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>Настройки</button>
+  <button class="tab" id="todayTab" aria-selected="false" data-tab="today">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Ближайший</button>
+</div></nav>
+
+<div class="scrim" id="scrim" hidden>
+  <form class="sheet" id="sheet" novalidate>
+    <div class="grab"></div>
+    <h2 id="sheetTitle">Новый урок</h2>
+    <div class="form">
+      <div class="field"><label for="fStudent">Ученик</label><input id="fStudent" list="students" autocomplete="off" placeholder="Имя ученика" required><datalist id="students"></datalist></div>
+      <div class="two">
+        <div class="field"><label for="fDate">Дата</label><input id="fDate" type="date" required></div>
+        <div class="field"><label for="fTime">Начало</label><input id="fTime" type="time" required></div>
+      </div>
+      <div class="field"><span class="lbl">Длительность</span>
+        <div class="durs" id="durs"></div>
+        <input id="fDur" type="number" min="5" step="5" inputmode="numeric" aria-label="Длительность в минутах">
+      </div>
+      <div class="two">
+        <div class="field"><label for="fRate">Ставка</label><input id="fRate" type="number" min="0" step="any" inputmode="decimal" placeholder="—"></div>
+        <div class="field"><label for="fRem">Напомнить</label><select id="fRem"></select></div>
+      </div>
+      <div class="field"><label for="fNote">Тема / заметка</label><textarea id="fNote" rows="2" placeholder="Например: подготовка к ЕГЭ, задание 17"></textarea></div>
+      <div id="repeatBox" class="two" style="align-items:end">
+        <label class="check"><input type="checkbox" id="fRepeat"><span>Повторять каждую неделю</span></label>
+        <div class="field"><label for="fWeeks">Сколько недель</label><input id="fWeeks" type="number" min="2" max="26" value="4" inputmode="numeric" disabled></div>
+      </div>
+      <p class="hint" id="formErr" hidden style="color:var(--cancel)"></p>
+      <div id="delConfirm" class="confirm" hidden>
+        <span>Удалить урок насовсем? Он пропадёт из отчёта. Если урок просто не состоится, лучше нажмите «Отменить урок».</span>
+        <div class="row-btns"><button type="button" class="btn" id="delYes" style="background:var(--cancel)">Удалить</button><button type="button" class="btn ghost" id="delNo">Не удалять</button></div>
+      </div>
+      <div class="sheet-acts">
+        <button type="button" class="btn ghost" id="closeSheet">Закрыть</button>
+        <button type="submit" class="btn" id="saveLesson">Сохранить</button>
+      </div>
+      <button type="button" class="act danger" id="delLesson" hidden style="align-self:flex-start">Удалить урок</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+const $ = (id) => document.getElementById(id);
+const GCAL = "Google Calendar";
+const TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return undefined } })();
+const MONTHS = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+const MONTHS_GEN = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+const WD_LONG = ["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
+const REMINDERS = [[0,"Без напоминания"],[10,"За 10 минут"],[15,"За 15 минут"],[30,"За 30 минут"],[60,"За 1 час"],[120,"За 2 часа"],[1440,"За день"]];
+const DURS = [30,45,60,90,120];
+
+const state = {
+  lessons: new Map(),
+  settings: { dur: 60, rate: "", cur: "₽", rem: 30, sync: true },
+  view: new Date(), sel: ymd(new Date()), tab: "cal",
+  editing: null, store: null, mcp: null,
+};
+state.view.setDate(1);
+
+/* ---------- даты ---------- */
+function pad(n) { return String(n).padStart(2, "0") }
+function ymd(d) { return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) }
+function parseLocal(date, time) { const [y,m,d] = date.split("-").map(Number); const [h,mi] = (time||"00:00").split(":").map(Number); return new Date(y, m-1, d, h, mi) }
+function isoLocal(d) { return ymd(d) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":00" }
+function addMin(d, m) { return new Date(d.getTime() + m*60000) }
+function hm(d) { return pad(d.getHours()) + ":" + pad(d.getMinutes()) }
+function fmtHours(min) { const h = min/60; return (Math.round(h*100)/100).toLocaleString("ru-RU") }
+function fmtMoney(v) { return Math.round(v*100)/100 === Math.round(v) ? Math.round(v).toLocaleString("ru-RU") : v.toLocaleString("ru-RU", {maximumFractionDigits: 2}) }
+function plural(n, a, b, c) { const m10 = n%10, m100 = n%100; return m10===1&&m100!==11 ? a : (m10>=2&&m10<=4&&(m100<12||m100>14) ? b : c) }
+
+/* ---------- статус ---------- */
+function effStatus(l) {
+  if (l.status === "cancelled") return "cancelled";
+  if (l.status === "done") return "done";
+  return addMin(parseLocal(l.date, l.time), l.dur) <= new Date() ? "done" : "planned";
+}
+const STATUS_TXT = { planned: "Запланирован", done: "Проведён", cancelled: "Отменён" };
+
+/* ---------- хранилище: облако (db) или этот браузер ---------- */
+function localStore() {
+  const KEY = "tutor-lessons-v1";
+  let data = { lessons: {}, settings: null };
+  try { const raw = localStorage.getItem(KEY); if (raw) data = JSON.parse(raw) } catch {}
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(data)) } catch {} };
+  let onL = () => {};
+  return {
+    kind: "local",
+    subscribe(onLessons, onSettings) { onL = onLessons; onLessons(Object.values(data.lessons)); if (data.settings) onSettings(data.settings) },
+    async save(l) { data.lessons[l.id] = l; persist(); onL(Object.values(data.lessons)) },
+    async remove(id) { delete data.lessons[id]; persist(); onL(Object.values(data.lessons)) },
+    async saveSettings(s) { data.settings = s; persist() },
+  };
+}
+function cloudStore(db, uid) {
+  const root = db.doc("data/users/" + uid + "/app");
+  const col = root.collection("lessons");
+  const settingsRef = db.doc("data/users/" + uid + "/settings");
+  return {
+    kind: "cloud",
+    subscribe(onLessons, onSettings, onErr) {
+      col.onSnapshot((snap) => onLessons(snap.docs.map(d => ({ ...d.data(), id: d.id }))), onErr);
+      settingsRef.onSnapshot((s) => { if (s.exists) onSettings(s.data()) }, onErr);
+    },
+    async save(l) { const { id, ...body } = l; await col.doc(id).set(body) },
+    async remove(id) { await col.doc(id).delete() },
+    async saveSettings(s) { await settingsRef.set(s) },
+  };
+}
+function newId() { return "l" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
+
+/* ---------- Google Календарь ---------- */
+function gcalErrText(e) {
+  switch (e && e.code) {
+    case "server_not_connected": return "Google Календарь не подключён. Добавьте его в claude.ai → Настройки → Коннекторы.";
+    case "needs_reauth": return "Нужно заново подключить Google Календарь в claude.ai → Настройки → Коннекторы.";
+    case "not_in_manifest": case "not_granted": case "consent_required": return "Нет разрешения на Google Календарь. Разрешите его в меню «Разрешения» этой страницы.";
+    case "selection_required": return "Выберите, какой Google Календарь использовать, в появившемся окне.";
+    case "server_unavailable": return "Google Календарь сейчас не отвечает. Урок сохранён, напоминание не добавлено.";
+    case "tool_error": return "Google Календарь отклонил запрос: " + (e.message || "");
+    default: return "Не удалось связаться с Google Календарём. Урок сохранён.";
+  }
+}
+function eventBody(l) {
+  const start = parseLocal(l.date, l.time);
+  const body = {
+    summary: "Урок: " + l.student,
+    startTime: isoLocal(start),
+    endTime: isoLocal(addMin(start, l.dur)),
+    description: (l.note ? l.note + "\n\n" : "") + "Создано из «Журнала уроков».",
+  };
+  if (TZ) body.timeZone = TZ;
+  if (l.rem > 0) body.overrideReminders = [{ method: "popup", minutes: l.rem }];
+  else body.useDefaultReminders = false;
+  return body;
+}
+function pickEventId(res) {
+  const p = res && res.payload;
+  if (p && typeof p === "object") return p.id || (p.event && p.event.id) || null;
+  if (typeof p === "string") { const m = p.match(/"id"\s*:\s*"([^"]+)"/); return m ? m[1] : null }
+  return null;
+}
+async function gcalCreate(l) {
+  const r = await state.mcp.callTool(GCAL, "create_event", { ...eventBody(l), notificationLevel: "NONE" });
+  return pickEventId(r);
+}
+async function gcalUpdate(l) {
+  await state.mcp.callTool(GCAL, "update_event", { eventId: l.gcalId, ...eventBody(l), notificationLevel: "NONE" });
+}
+async function gcalDelete(id) {
+  await state.mcp.callTool(GCAL, "delete_event", { eventId: id, notificationLevel: "NONE" });
+}
+function wantsCalendar(l) { return state.settings.sync && state.mcp && l.status !== "cancelled" && effStatus(l) === "planned" }
+
+/* синхронизировать один урок с календарём, вернуть обновлённый урок */
+async function syncLesson(l, prev) {
+  if (!state.mcp) return l;
+  try {
+    if (wantsCalendar(l)) {
+      if (l.gcalId) await gcalUpdate(l);
+      else { const id = await gcalCreate(l); if (id) l = { ...l, gcalId: id } }
+    } else if (l.gcalId && l.status === "cancelled") {
+      await gcalDelete(l.gcalId); l = { ...l }; delete l.gcalId;
+    }
+  } catch (e) {
+    if (e && e.code === "tool_error" && l.gcalId && /not.?found|404|deleted/i.test(e.message || "")) {
+      // событие удалили вручную в календаре — создадим заново
+      const copy = { ...l }; delete copy.gcalId;
+      return syncLesson(copy, prev);
+    }
+    toast(gcalErrText(e), 5200);
+  }
+  return l;
+}
+
+/* ---------- отрисовка ---------- */
+function monthLessons(y, m) {
+  const pre = y + "-" + pad(m+1) + "-";
+  return [...state.lessons.values()].filter(l => l.date.startsWith(pre));
+}
+function byTime(a, b) { return (a.date + a.time).localeCompare(b.date + b.time) }
+
+function renderHeader() {
+  const y = state.view.getFullYear(), m = state.view.getMonth();
+  $("monthName").textContent = MONTHS[m] + " " + y;
+  const ls = monthLessons(y, m);
+  let done = 0, mins = 0, planned = 0, cancelled = 0;
+  for (const l of ls) { const s = effStatus(l); if (s === "done") { done++; mins += l.dur } else if (s === "planned") planned++; else cancelled++ }
+  $("tDone").textContent = done;
+  $("tHours").textContent = fmtHours(mins) + " ч";
+  if (state.tab === "report") { $("tSecond").textContent = cancelled; $("tSecondLbl").textContent = "Отменено" }
+  else { $("tSecond").textContent = planned; $("tSecondLbl").textContent = "Впереди" }
+}
+
+function renderGrid() {
+  const y = state.view.getFullYear(), m = state.view.getMonth();
+  const first = new Date(y, m, 1);
+  const shift = (first.getDay() + 6) % 7;
+  const start = new Date(y, m, 1 - shift);
+  const today = ymd(new Date());
+  const byDay = {};
+  for (const l of state.lessons.values()) (byDay[l.date] ||= []).push(l);
+  const g = $("grid"); g.textContent = "";
+  const cells = Math.ceil((shift + new Date(y, m+1, 0).getDate()) / 7) * 7;
+  for (let i = 0; i < cells; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const key = ymd(d);
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "day";
+    if (d.getMonth() !== m) b.classList.add("out");
+    if (key === today) b.classList.add("today");
+    if (key === state.sel) b.classList.add("sel");
+    const ls = (byDay[key] || []).sort(byTime);
+    b.setAttribute("aria-label", d.getDate() + " " + MONTHS_GEN[d.getMonth()] + (ls.length ? ", уроков: " + ls.length : ""));
+    const n = document.createElement("span"); n.className = "n"; n.textContent = d.getDate(); b.append(n);
+    if (ls.length) {
+      const mk = document.createElement("span"); mk.className = "marks";
+      for (const l of ls.slice(0, 6)) { const i2 = document.createElement("i"); i2.className = "mk " + effStatus(l); mk.append(i2) }
+      b.append(mk);
+    }
+    b.onclick = () => { state.sel = key; if (d.getMonth() !== m) { state.view = new Date(d.getFullYear(), d.getMonth(), 1) } render() };
+    g.append(b);
+  }
+}
+
+function lessonCard(l) {
+  const s = effStatus(l);
+  const start = parseLocal(l.date, l.time);
+  const el = document.createElement("article"); el.className = "lesson " + s;
+  const t = document.createElement("div"); t.className = "time";
+  t.textContent = l.time; const sm = document.createElement("small"); sm.textContent = "до " + hm(addMin(start, l.dur)); t.append(sm);
+  const body = document.createElement("div"); body.className = "body";
+  const who = document.createElement("div"); who.className = "who"; who.textContent = l.student;
+  const meta = document.createElement("div"); meta.className = "meta";
+  const bits = [l.dur + " мин"];
+  if (l.rate) bits.push(fmtMoney(+l.rate) + " " + state.settings.cur);
+  if (l.rem > 0 && s === "planned") bits.push(l.gcalId ? "🔔 в Google Календаре" : "напоминание не добавлено");
+  if (l.note) bits.push(l.note);
+  meta.textContent = bits.join(" · ");
+  const pill = document.createElement("span"); pill.className = "pill " + s;
+  pill.textContent = STATUS_TXT[s] + (s === "done" && l.status !== "done" ? " (авто)" : "");
+  body.append(who, pill, meta);
+  const acts = document.createElement("div"); acts.className = "acts";
+  const mk = (txt, cls, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "act " + (cls||""); b.textContent = txt; b.onclick = fn; acts.append(b) };
+  if (s === "cancelled") mk("Вернуть урок", "good", () => setStatus(l, "planned"));
+  else {
+    if (s === "planned") mk("Отметить проведённым", "good", () => setStatus(l, "done"));
+    mk(s === "done" ? "Не состоялся" : "Отменить урок", "danger", () => setStatus(l, "cancelled"));
+  }
+  mk("Изменить", "", () => openSheet(l));
+  el.append(t, body, acts);
+  return el;
+}
+
+function renderDay() {
+  const d = parseLocal(state.sel, "00:00");
+  const isToday = state.sel === ymd(new Date());
+  $("dayTitle").textContent = (isToday ? "Сегодня, " : "") + d.getDate() + " " + MONTHS_GEN[d.getMonth()] + (isToday ? "" : ", " + WD_LONG[d.getDay()]);
+  const ls = [...state.lessons.values()].filter(l => l.date === state.sel).sort(byTime);
+  const active = ls.filter(l => effStatus(l) !== "cancelled");
+  const mins = active.reduce((a, l) => a + l.dur, 0);
+  $("dayCount").textContent = ls.length ? active.length + " " + plural(active.length, "урок", "урока", "уроков") + " · " + fmtHours(mins) + " ч" : "";
+  const list = $("dayList"); list.textContent = "";
+  if (!ls.length) {
+    const e = document.createElement("div"); e.className = "empty";
+    e.innerHTML = "В этот день уроков нет.<br>";
+    const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.textContent = "+ Добавить урок"; b.onclick = () => openSheet(null);
+    e.append(b); list.append(e); return;
+  }
+  for (const l of ls) list.append(lessonCard(l));
+}
+
+function reportData() {
+  const y = state.view.getFullYear(), m = state.view.getMonth();
+  const done = monthLessons(y, m).filter(l => effStatus(l) === "done").sort(byTime);
+  const per = new Map();
+  for (const l of done) {
+    const r = per.get(l.student) || { n: 0, mins: 0, sum: 0, hasRate: false };
+    r.n++; r.mins += l.dur; if (l.rate !== "" && l.rate != null) { r.sum += +l.rate; r.hasRate = true }
+    per.set(l.student, r);
+  }
+  return { y, m, done, per };
+}
+function reportText() {
+  const { y, m, done, per } = reportData();
+  const cur = state.settings.cur;
+  const lines = ["Отчёт за " + MONTHS[m] + " " + y, ""];
+  if (!done.length) lines.push("Проведённых уроков нет.");
+  for (const l of done) {
+    const d = parseLocal(l.date, l.time);
+    lines.push(pad(d.getDate()) + "." + pad(m+1) + " " + l.time + " — " + l.student + ", " + l.dur + " мин" + (l.rate ? ", " + fmtMoney(+l.rate) + " " + cur : "") + (l.note ? " (" + l.note + ")" : ""));
+  }
+  const mins = done.reduce((a, l) => a + l.dur, 0);
+  const sum = done.reduce((a, l) => a + (+l.rate || 0), 0);
+  lines.push("", "Итого: " + done.length + " " + plural(done.length, "урок", "урока", "уроков") + ", " + fmtHours(mins) + " ч" + (sum ? ", " + fmtMoney(sum) + " " + cur : ""));
+  if (per.size > 1) { lines.push(""); for (const [k, r] of per) lines.push(k + ": " + r.n + " ур., " + fmtHours(r.mins) + " ч" + (r.hasRate ? ", " + fmtMoney(r.sum) + " " + cur : "")) }
+  return lines.join("\n");
+}
+function renderReport() {
+  const { per } = reportData();
+  const cur = state.settings.cur;
+  $("thSum").textContent = "Сумма, " + cur;
+  const tb = $("repBody"); tb.textContent = "";
+  let n = 0, mins = 0, sum = 0;
+  const rows = [...per.entries()].sort((a, b) => b[1].n - a[1].n);
+  for (const [k, r] of rows) {
+    n += r.n; mins += r.mins; sum += r.sum;
+    const tr = document.createElement("tr");
+    const c = (t, cls) => { const td = document.createElement("td"); td.textContent = t; if (cls) td.className = cls; tr.append(td) };
+    c(k); c(r.n, "r"); c(fmtHours(r.mins), "r"); c(r.hasRate ? fmtMoney(r.sum) : "—", "r");
+    tb.append(tr);
+  }
+  if (!rows.length) { const tr = document.createElement("tr"); const td = document.createElement("td"); td.colSpan = 4; td.className = "hint"; td.textContent = "В этом месяце пока нет проведённых уроков."; tr.append(td); tb.append(tr) }
+  $("repFoot").innerHTML = rows.length ? "<tr><td>Итого</td><td class='r'>" + n + "</td><td class='r'>" + fmtHours(mins) + "</td><td class='r'>" + (sum ? fmtMoney(sum) : "—") + "</td></tr>" : "";
+  $("repText").textContent = reportText();
+}
+
+function renderSettingsForm() {
+  const s = state.settings;
+  $("sDur").value = s.dur; $("sRate").value = s.rate; $("sCur").value = s.cur; $("sRem").value = String(s.rem); $("sSync").checked = !!s.sync;
+}
+
+function render() {
+  renderHeader();
+  $("viewCal").hidden = state.tab !== "cal";
+  $("viewReport").hidden = state.tab !== "report";
+  $("viewSettings").hidden = state.tab !== "settings";
+  document.querySelectorAll(".tab[data-tab]").forEach(t => t.setAttribute("aria-selected", String(t.dataset.tab === state.tab)));
+  if (state.tab === "cal") { renderGrid(); renderDay() }
+  if (state.tab === "report") renderReport();
+  const names = [...new Set([...state.lessons.values()].map(l => l.student))].sort();
+  const dl = $("students"); dl.textContent = "";
+  for (const n of names) { const o = document.createElement("option"); o.value = n; dl.append(o) }
+}
+
+/* ---------- действия ---------- */
+let toastT;
+function toast(msg, ms = 2600) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms) }
+
+async function persist(l) {
+  state.lessons.set(l.id, l); render();
+  try { await state.store.save(l) } catch (e) { toast(e && e.code === "quota_exceeded" ? "Хранилище заполнено: удалите старые уроки." : "Не удалось сохранить. Проверьте интернет и попробуйте ещё раз.", 4500) }
+}
+
+async function setStatus(l, status) {
+  let next = { ...l, status };
+  await persist(next);
+  const after = await syncLesson(next, l);
+  if (after !== next) await persist(after);
+  toast(status === "cancelled" ? "Урок отменён" + (l.gcalId ? " и убран из Google Календаря" : "") : status === "done" ? "Отмечен как проведённый" : "Урок возвращён");
+}
+
+/* ---------- форма урока ---------- */
+function fillSelect(sel) { sel.textContent = ""; for (const [v, t] of REMINDERS) { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.append(o) } }
+function setDur(v) { $("fDur").value = v; document.querySelectorAll("#durs button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.v === +v))) }
+
+function openSheet(l) {
+  state.editing = l;
+  const s = state.settings;
+  $("sheetTitle").textContent = l ? "Урок" : "Новый урок";
+  $("fStudent").value = l ? l.student : "";
+  $("fDate").value = l ? l.date : state.sel;
+  $("fTime").value = l ? l.time : "16:00";
+  setDur(l ? l.dur : s.dur);
+  $("fRate").value = l ? (l.rate ?? "") : s.rate;
+  $("fRem").value = String(l ? l.rem : s.rem);
+  $("fNote").value = l ? (l.note || "") : "";
+  $("repeatBox").hidden = !!l;
+  $("fRepeat").checked = false; $("fWeeks").disabled = true;
+  $("delLesson").hidden = !l; $("delConfirm").hidden = true;
+  $("formErr").hidden = true;
+  $("scrim").hidden = false;
+  if (!l) setTimeout(() => $("fStudent").focus(), 50);
+}
+function closeSheet() { $("scrim").hidden = true; state.editing = null }
+
+async function submitLesson(ev) {
+  ev.preventDefault();
+  const student = $("fStudent").value.trim(), date = $("fDate").value, time = $("fTime").value, dur = parseInt($("fDur").value, 10);
+  const err = !student ? "Введите имя ученика." : !date ? "Выберите дату." : !time ? "Укажите время начала." : !(dur > 0) ? "Укажите длительность в минутах." : "";
+  if (err) { $("formErr").textContent = err; $("formErr").hidden = false; return }
+  const base = { student, date, time, dur, rate: $("fRate").value === "" ? "" : +$("fRate").value, rem: +$("fRem").value, note: $("fNote").value.trim() };
+  const prev = state.editing;
+  closeSheet();
+  if (prev) {
+    const timeChanged = prev.date !== date || prev.time !== time;
+    const next = { ...prev, ...base };
+    if (timeChanged && next.status === "done") next.status = "planned";
+    await persist(next);
+    const after = await syncLesson(next, prev);
+    if (after !== next) await persist(after);
+    toast("Урок сохранён");
+  } else {
+    const weeks = $("fRepeat").checked ? Math.min(26, Math.max(2, parseInt($("fWeeks").value, 10) || 4)) : 1;
+    const series = weeks > 1 ? newId() : undefined;
+    const first = parseLocal(date, time);
+    let added = 0;
+    for (let i = 0; i < weeks; i++) {
+      const d = new Date(first); d.setDate(first.getDate() + 7*i);
+      let l = { id: newId(), ...base, date: ymd(d), status: "planned", created: Date.now() };
+      if (series) l.series = series;
+      await persist(l);
+      const after = await syncLesson(l);
+      if (after !== l) await persist(after);
+      added++;
+    }
+    state.sel = date; state.view = new Date(first.getFullYear(), first.getMonth(), 1); render();
+    toast(added > 1 ? "Добавлено уроков: " + added : "Урок добавлен");
+  }
+}
+
+async function deleteLesson() {
+  const l = state.editing; if (!l) return;
+  closeSheet();
+  state.lessons.delete(l.id); render();
+  try { await state.store.remove(l.id) } catch { toast("Не удалось удалить. Попробуйте ещё раз.") }
+  if (l.gcalId && state.mcp) { try { await gcalDelete(l.gcalId) } catch (e) { if (e && e.code !== "tool_error") toast(gcalErrText(e), 5000) } }
+  toast("Урок удалён");
+}
+
+function nearest() {
+  const now = new Date();
+  const up = [...state.lessons.values()].filter(l => effStatus(l) === "planned").sort(byTime)[0];
+  if (!up) { toast("Запланированных уроков нет"); return }
+  const d = parseLocal(up.date, up.time);
+  state.sel = up.date; state.view = new Date(d.getFullYear(), d.getMonth(), 1); state.tab = "cal"; render();
+  const mins = Math.round((d - now) / 60000);
+  const when = mins < 60 ? "через " + mins + " мин" : mins < 1440 ? "через " + Math.round(mins/60) + " ч" : d.getDate() + " " + MONTHS_GEN[d.getMonth()];
+  toast("Ближайший: " + up.student + ", " + up.time + " (" + when + ")", 3500);
+}
+
+/* ---------- события ---------- */
+$("prev").onclick = () => { state.view = new Date(state.view.getFullYear(), state.view.getMonth()-1, 1); render() };
+$("next").onclick = () => { state.view = new Date(state.view.getFullYear(), state.view.getMonth()+1, 1); render() };
+$("todayBtn").onclick = () => { const t = new Date(); state.view = new Date(t.getFullYear(), t.getMonth(), 1); state.sel = ymd(t); render() };
+document.querySelectorAll(".tab[data-tab]").forEach(t => t.onclick = () => {
+  if (t.dataset.tab === "today") return nearest();
+  state.tab = t.dataset.tab; if (state.tab === "settings") renderSettingsForm(); render(); window.scrollTo(0, 0);
+});
+$("addBtn").onclick = () => openSheet(null);
+$("closeSheet").onclick = closeSheet;
+$("scrim").addEventListener("click", (e) => { if (e.target === $("scrim")) closeSheet() });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("scrim").hidden) closeSheet() });
+$("sheet").addEventListener("submit", submitLesson);
+$("fRepeat").onchange = () => { $("fWeeks").disabled = !$("fRepeat").checked };
+$("fDur").oninput = () => setDur($("fDur").value);
+$("delLesson").onclick = () => { $("delConfirm").hidden = false };
+$("delNo").onclick = () => { $("delConfirm").hidden = true };
+$("delYes").onclick = deleteLesson;
+$("saveSettings").onclick = async () => {
+  const s = { dur: Math.max(5, parseInt($("sDur").value, 10) || 60), rate: $("sRate").value === "" ? "" : +$("sRate").value, cur: $("sCur").value.trim() || "₽", rem: +$("sRem").value, sync: $("sSync").checked };
+  state.settings = s; render();
+  try { await state.store.saveSettings(s); toast("Настройки сохранены") } catch { toast("Не удалось сохранить настройки") }
+};
+$("copyRep").onclick = () => {
+  const txt = reportText();
+  navigator.clipboard.writeText(txt).then(() => toast("Отчёт скопирован"), () => {
+    const r = document.createRange(); r.selectNodeContents($("repText")); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    toast("Текст выделен — скопируйте его вручную");
+  });
+};
+
+{ const box = $("durs"); for (const v of DURS) { const b = document.createElement("button"); b.type = "button"; b.dataset.v = v; b.textContent = v + " мин"; b.onclick = () => setDur(v); box.append(b) } }
+fillSelect($("fRem")); fillSelect($("sRem"));
+
+/* ---------- запуск ---------- */
+function setSync(kind, text) { const s = $("sync"); s.className = "sync " + kind; $("syncText").textContent = text }
+
+function startWith(store) {
+  state.store = store;
+  store.subscribe(
+    (list) => { state.lessons = new Map(list.map(l => [l.id, l])); render() },
+    (s) => { state.settings = { ...state.settings, ...s }; render(); if (state.tab === "settings") renderSettingsForm() },
+    () => setSync("warn", "Связь с облаком потеряна. Обновите страницу.")
+  );
+}
+
+render();
+renderSettingsForm();
+setInterval(() => { if ($("scrim").hidden) render() }, 60000);
+
+(async () => {
+  const c = window.claude;
+  if (!c || !c.use) { startWith(localStore()); setSync("warn", "Данные хранятся только в этом браузере"); return }
+  const [db, user, mcp, downloads] = await Promise.all([c.use("db"), c.use("user"), c.use("mcp"), c.use("downloads")]).catch(() => [null, null, null, null]);
+  const uid = user ? await user.id().catch(() => null) : null;
+  state.mcp = mcp;
+  if (db && uid) { startWith(cloudStore(db, uid)); setSync("ok", mcp ? "Сохраняется в облаке · напоминания через Google Календарь" : "Сохраняется в облаке · Google Календарь недоступен") }
+  else { startWith(localStore()); setSync("warn", "Войдите в claude.ai, чтобы уроки сохранялись в облаке. Сейчас — только этот браузер.") }
+  if (downloads) {
+    const b = $("csvRep"); b.hidden = false;
+    b.onclick = async () => {
+      const { y, m, done } = reportData();
+      const esc = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+      const rows = [["Дата","Начало","Ученик","Минут","Ставка","Заметка"].map(esc).join(";")];
+      for (const l of done) rows.push([l.date, l.time, l.student, l.dur, l.rate, l.note].map(esc).join(";"));
+      try { await downloads.save({ filename: "уроки-" + y + "-" + pad(m+1) + ".csv", data: new Blob(["﻿" + rows.join("\r\n")], { type: "text/csv" }) }) }
+      catch (e) { if (e && e.code !== "cancelled" && e.code !== "declined") toast("Не удалось скачать файл") }
+    };
+  }
+})();
+})();
+</script>
